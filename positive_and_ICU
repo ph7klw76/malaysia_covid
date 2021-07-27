@@ -1,0 +1,95 @@
+"""
+Created on Tue Jul 27 15:53:52 2021
+
+@author: AP WOON Kai Lin
+"""
+import urllib.request
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import pandas as pd
+
+url = 'https://raw.githubusercontent.com/MoH-Malaysia/covid19-public/main/epidemic/tests_malaysia.csv'
+output= f'tests_malaysia.csv' # output's file name/ location
+urllib.request.urlretrieve(url, output)
+url = 'https://raw.githubusercontent.com/MoH-Malaysia/covid19-public/main/epidemic/cases_malaysia.csv'
+output= f'cases_malaysia.csv' # output's file name/ location
+urllib.request.urlretrieve(url, output)
+print(f"File {output} -- saved!")
+url = 'https://raw.githubusercontent.com/MoH-Malaysia/covid19-public/main/epidemic/icu.csv'
+output= f'icu.csv' # output's file name/ location
+urllib.request.urlretrieve(url, output)
+
+tests_malaysia = pd.read_csv("tests_malaysia.csv")
+cases_malaysia = pd.read_csv("cases_malaysia.csv")
+ICU_malaysia = pd.read_csv("icu.csv")
+
+
+date_case=cases_malaysia['date']
+date_test=tests_malaysia['date']  # early data
+cases_new=cases_malaysia['cases_new']
+tests_rtk_ag=tests_malaysia[' rtk-ag']
+tests_pcr=tests_malaysia[' pcr']
+covid_ICU=ICU_malaysia['icu_covid']
+date_ICU=ICU_malaysia['date']  # the late
+
+
+for i in range(len(date_test)):
+    if date_ICU[0]==date_test[i]:
+        startdate_test=i
+        break
+    
+for i in range(len(date_case)):
+    if date_ICU[0]==date_case[i]:
+        startdate_case=i
+        break
+ICU=[]
+for i in range(len(date_ICU)-1):
+    date_ICU=ICU_malaysia['date']
+    if i==0:
+        total_ICU=covid_ICU[0]
+    if date_ICU[0+i]==date_ICU[i+1]:
+        total_ICU=total_ICU+covid_ICU[i+1]
+        date=date_ICU[i+1]
+    else:
+        ICU.append(total_ICU)
+        total_ICU=covid_ICU[i+1]
+        
+  
+data = []
+for ii in range(len(date_case)-startdate_case):
+    positive=cases_new[ii+startdate_case]/(tests_pcr[ii+startdate_test]+(tests_rtk_ag[ii+startdate_test]))
+
+    try:
+        data.append([date_case[ii+startdate_case], positive,ICU[ii]])
+    except:
+        break
+
+                 
+df = pd.DataFrame(data, columns=['date', 'positive','no_ICU'])
+positive_rate=df['positive']    
+date=df['date']
+
+ICU_covid=df['no_ICU']    
+
+rollingmean=df.positive.rolling(window=7).mean()
+
+matplotlib.rcParams.update({'font.size': 22})
+fig, ax = plt.subplots()
+fig.autofmt_xdate(rotation=90)
+fig.set_size_inches(18.5, 10.5)
+ax.plot(date,positive_rate*100, label='daily')
+ax.plot(date,rollingmean*100,label='7-day average')
+ax.set_xlabel('date')
+ax.set_ylabel('Percentage %')
+ax.set_title('Covid 19 Positive Rate and ICU_cases versus Date')
+ax.xaxis.set_major_locator(ticker.MultipleLocator(30))
+plt.legend()
+ax2 = ax.twinx()
+ax2.plot(date,ICU_covid, label='daily_ICU', color='r')
+ax2.xaxis.set_major_locator(ticker.MultipleLocator(30))
+ax2.set_ylabel('ICU_bed_occupied', color='r')
+ax2.tick_params('y', colors='r')
+ax2.legend(loc='lower left')
+
+plt.show()
